@@ -93,6 +93,41 @@ StaleMind/
    `uvicorn main:app --reload`
 4. The API will be available at `http://127.0.0.1:8000`. You can interact with the environment via POST requests to `/reset` and `/step`, and GET requests to `/state`.
 
+## Failure Case
+
+When tested against `Qwen/Qwen2.5-7B-Instruct`, the model was instructed to follow the user's stated preferences (`work > family`). After the hidden drift event flipped the true preference to `family > work`, the model continued to ACCEPT work requests because its visible preferences were never updated. This produced a sharp reward drop from 1.0 to near 0.0 on every post-drift step.
+
+Example from Medium scenario (drift at step 5):
+```
+Step  4 | ACCEPT  | reward: 1.00
+Step  5 | ACCEPT  | reward: 0.03   <- drift happened, model did not adapt
+Step  6 | ACCEPT  | reward: 0.03   | DRIFT ACTIVE | *** FAILURE ***
+Step  7 | ACCEPT  | reward: 0.03   | DRIFT ACTIVE | *** FAILURE ***
+```
+
+The model's reasoning remained: "The user's stated preference is work > family, so I must accept the work request." This confirms the core thesis: an agent that trusts stale context will fail silently and confidently.
+
+## Evaluation
+
+Comparison of Naive (always ACCEPT) vs Adaptive (drift-aware) agents across all scenarios:
+
+| Scenario | Naive Agent | Adaptive Agent | Improvement |
+|----------|-------------|----------------|-------------|
+| Easy     | 6.10        | 9.04           | +2.94       |
+| Medium   | 6.10        | 9.03           | +2.93       |
+| Hard     | 6.10        | 9.03           | +2.93       |
+
+The adaptive agent detects soft drift signals in the observation message (keywords like "son", "home", "busy") and switches from ACCEPT to REJECT, maintaining high reward throughout the episode.
+
+## Demo
+
+Live environment API: https://mrhapile-stalemind.hf.space
+
+Endpoints:
+- `POST /reset` — Reset environment (optional: `{"scenario_index": 0|1|2}`)
+- `POST /step` — Take action (`{"type": "ACCEPT", "content": ""}`)
+- `GET /state` — Current observation
+
 ## Future Improvements
 - Multi-Agent Scenarios: Introduce secondary agents that the primary agent can query to clarify ambiguous drift signals.
 - Continuous Action Spaces: Expand the action payload to allow for fully generated text responses evaluated by an LLM-as-a-judge.
