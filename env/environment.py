@@ -72,8 +72,25 @@ class StaleMindEnv:
             self.state_dict["true_preferences"] = ["family > work"]
             self.state_dict["drift_triggered"] = True
 
-        action_type = action["type"]
-        content = action.get("content", "")
+        if isinstance(action, str):
+            try:
+                import json
+                parsed_action = json.loads(action)
+                action_type = parsed_action.get("type", "")
+                content = parsed_action.get("content", "")
+            except Exception:
+                self.state_dict["done"] = True
+                return self.state(), -2.0, True, {"error": "Invalid JSON"}
+        elif isinstance(action, dict):
+            action_type = action.get("type", "")
+            content = action.get("content", "")
+        else:
+            self.state_dict["done"] = True
+            return self.state(), -2.0, True, {"error": "Invalid action format"}
+
+        if action_type not in ACTIONS:
+            self.state_dict["done"] = True
+            return self.state(), -2.0, True, {"error": f"Invalid action type: {action_type}"}
 
         reward = self._compute_reward(action_type, content)
 
@@ -109,8 +126,6 @@ class StaleMindEnv:
         }
 
     def _compute_reward(self, action_type, content):
-        if action_type not in ACTIONS:
-            raise ValueError(f"Invalid action: {action_type}")
 
         reward = 0.0
         true_pref = self.state_dict["true_preferences"][0]
