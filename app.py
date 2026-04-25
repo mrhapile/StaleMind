@@ -5,8 +5,9 @@ Lets judges see drift happening, wrong decisions, and reward drops in real-time.
 
 import gradio as gr
 import requests
+import uuid
 
-BASE_URL = "https://mrhapile-stalemind.hf.space"
+BASE_URL = "http://localhost:8000"
 
 SCENARIOS = {
     "Easy (drift at step 7)": 0,
@@ -24,8 +25,10 @@ def run_full_episode(scenario_name, agent_type):
     """Run a full episode and return formatted results."""
     scenario_index = SCENARIOS[scenario_name]
 
+    session_id = str(uuid.uuid4())
+    
     # Reset
-    r = requests.post(f"{BASE_URL}/reset", json={"scenario_index": scenario_index})
+    r = requests.post(f"{BASE_URL}/reset", json={"scenario_index": scenario_index, "session_id": session_id})
     obs = r.json()["observation"]
 
     log_lines = []
@@ -53,6 +56,7 @@ def run_full_episode(scenario_name, agent_type):
                 reasoning = "No drift signal detected -> following work preference"
 
         # Take step
+        action["session_id"] = session_id
         r = requests.post(f"{BASE_URL}/step", json=action)
         result = r.json()
 
@@ -189,4 +193,4 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7861, theme=gr.themes.Soft())
+    demo.launch(server_name="0.0.0.0", server_port=7860, theme=gr.themes.Soft())

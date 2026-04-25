@@ -40,7 +40,7 @@ class StaleMindEnv:
         }
 
     def reset(self, scenario_index=None):
-        if scenario_index is not None:
+        if scenario_index is not None and scenario_index in [0, 1, 2]:
             self.scenario = SCENARIOS[scenario_index]
         else:
             self.scenario = random.choice(SCENARIOS)
@@ -60,7 +60,7 @@ class StaleMindEnv:
                 "family": 0.5
             }
         }
-        return self.state()
+        return self.state(), {}
 
     def step(self, action):
         if self.state_dict["done"]:
@@ -119,7 +119,7 @@ class StaleMindEnv:
             if action_type == "ACCEPT":
                 reward = 1.0
             elif action_type == "PROPOSE_RESCHEDULE":
-                reward = 0.7
+                reward = 0.5
             elif action_type == "ESCALATE":
                 reward = 0.5
             elif action_type == "DELEGATE":
@@ -133,7 +133,7 @@ class StaleMindEnv:
             if action_type == "REJECT":
                 reward = 1.0
             elif action_type == "PROPOSE_RESCHEDULE":
-                reward = 0.7
+                reward = 0.4
             elif action_type == "DRAFT_MESSAGE":
                 reward = 0.6
             elif action_type == "ESCALATE":
