@@ -1,3 +1,13 @@
+---
+title: Stalemind
+emoji: 🐨
+colorFrom: gray
+colorTo: green
+sdk: docker
+pinned: false
+license: mit
+short_description: A decision-making environment where agents fail under hidden
+---
 # StaleMind
 An RL-style environment demonstrating how autonomous agents fail when their internal understanding of the world becomes stale.
 
