@@ -6,6 +6,8 @@ Proves that Qwen2.5-7B-Instruct makes wrong decisions when preferences drift.
 import requests
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from huggingface_hub import InferenceClient
 
 BASE_URL = "https://mrhapile-stalemind.hf.space"
