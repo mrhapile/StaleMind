@@ -64,6 +64,20 @@ This document provides a comprehensive, technically rigorous system-level breakd
 * **Where it exists:** `env/environment.py` (`step()` method).
 * **How it works:** Actions deduct points from continuous tracking variables (e.g., REJECT penalizes the "boss" score by -0.1). The overall step reward is boosted by the average health of both relationships, penalizing agents that greedily optimize one preference while letting the other relationship collapse.
 
+### Direct LLM Payload Parsing & Error Recovery
+* **What it does:** Natively parses raw string outputs from LLMs and heavily penalizes hallucinations without crashing the training loop.
+* **Where it exists:** `env/environment.py` (`step()` method).
+* **How it works:** If the agent outputs invalid JSON or omits the required `"action"` / `"type"` keys, the environment catches the exception. Instead of setting `done=True` (which breaks RL rollouts), it returns a stable observation, `done=False`, and a massive `-2.0` reward penalty to quickly teach the model formatting constraints.
+
+### Advanced RL Reward Shaping
+* **What it does:** A multi-layered reward system designed to prevent RL exploitation (e.g., reward hacking or saturation).
+* **Where it exists:** `env/environment.py` (`_compute_reward()` method).
+* **How it works:** 
+  * **Anti-Saturation:** Base rewards are scaled (`* 0.8`) to ensure the agent doesn't hit the `1.0` maximum without earning contextual bonuses.
+  * **Temporal Consistency:** Tracks `last_action` and applies a `+0.05` bonus for maintaining a consistent strategy over multiple steps, preventing erratic behavior.
+  * **Weak Feedback Clipping:** Actions that historically yielded `0.0` (which teaches the agent nothing) are actively clipped to `-0.2` to provide strong negative gradients for incorrect actions.
+  * **Anti-Exploit:** If the agent blindly spams "ACCEPT" after drift has occurred, it receives a targeted `-0.2` penalty, and if relationships drop below 20% health, it receives a `-0.3` critical failure penalty.
+
 ### Concurrency & Session Management
 * **What it does:** Allows multiple simultaneous evaluations against the API without state corruption.
 * **Where it exists:** `main.py`.
@@ -139,9 +153,9 @@ This document provides a comprehensive, technically rigorous system-level breakd
 * **Unified API/UI Mounting (`gr.mount_gradio_app`)**:
   * **Why:** To avoid CORS nightmares, port conflicts in HuggingFace Spaces, and the complexity of managing multiple processes (e.g., Supervisord).
   * **Trade-off:** Couples the UI and API into a single Python process, meaning a heavy UI computation could theoretically block API request handling.
-* **Continuous Reward Function**:
-  * **Why:** Instead of a binary Pass/Fail, actions yield partial rewards (e.g., `PROPOSE_RESCHEDULE` yields 0.5 or 0.4).
-  * **Trade-off:** Requires careful balancing to ensure agents cannot exploit compromise actions to achieve high scores without actually deducing the drift.
+* **Advanced Reward Shaping over Binary Pass/Fail**:
+  * **Why:** Instead of a simple 1/0 Pass/Fail, actions yield partial base rewards that are dynamically scaled, penalized, and bounded between `[-2.0, 1.0]`. 
+  * **Trade-off:** While a highly engineered reward function is slightly more complex to maintain, it is fundamentally required for high-frequency RL fine-tuning (e.g., PPO/GRPO) to prevent the model from exploiting the environment (e.g., spamming "ACCEPT" or sending malformed JSON).
 
 ---
 
