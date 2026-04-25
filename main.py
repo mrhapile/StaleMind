@@ -19,6 +19,7 @@ def get_env(session_id: str) -> DriftGym:
 class ResetRequest(BaseModel):
     scenario_index: Optional[int] = None
     session_id: str = "default"
+    config: Optional[dict] = None
 
 class StepRequest(BaseModel):
     type: str
@@ -30,13 +31,13 @@ def reset(req: Optional[ResetRequest] = None):
     if req is None:
         req = ResetRequest()
     env = get_env(req.session_id)
-    obs, _ = env.reset(req.scenario_index)
+    obs, _ = env.reset(req.scenario_index, req.config)
     return {"observation": obs}
 
 @app.post("/step")
 def step(action: StepRequest):
     env = get_env(action.session_id)
-    obs, reward, done, _ = env.step(action.model_dump() if hasattr(action, 'model_dump') else action.dict())
+    obs, reward, done, info = env.step(action.model_dump() if hasattr(action, 'model_dump') else action.dict())
     
     if obs is None:
         return {
@@ -49,7 +50,8 @@ def step(action: StepRequest):
     return {
         "observation": obs,
         "reward": {"score": reward},
-        "done": done
+        "done": done,
+        "info": info,
     }
 
 @app.get("/state")
