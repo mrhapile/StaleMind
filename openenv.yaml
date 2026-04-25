@@ -7,18 +7,26 @@ actions:
   - PROPOSE_RESCHEDULE
   - DELEGATE
   - DRAFT_MESSAGE
+  - ASK_CLARIFICATION
 observation:
   step: int
   request: str
   message: str
   visible_preferences: list
   relationships: dict
+  history: list
+  urgency: float
+  impact: float
+  reversibility: float
+  delegation_feasibility: float
+  commitments: list
+  commitment_load: float
 reward:
   score: float
 tasks:
   - name: easy
-    description: Late drift with strong signal
+    description: Late drift with cleaner evidence
   - name: medium
-    description: Mid drift with moderate signal
+    description: Mid drift with ambiguous evidence
   - name: hard
-    description: Early drift with weak signal
+    description: Early drift with delayed and conflicting evidence
