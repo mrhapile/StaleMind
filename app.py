@@ -6,8 +6,18 @@ Lets judges see drift happening, wrong decisions, and reward drops in real-time.
 import gradio as gr
 import requests
 import uuid
+from fastapi.middleware.cors import CORSMiddleware
+from main import app as api
 
-BASE_URL = "http://localhost:8000"
+api.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+BASE_URL = "http://127.0.0.1:7860"
 
 SCENARIOS = {
     "Easy (drift at step 7)": 0,
@@ -192,5 +202,8 @@ with gr.Blocks(
     """)
 
 
+app = gr.mount_gradio_app(api, demo, path="/")
+
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, theme=gr.themes.Soft())
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)

@@ -14,9 +14,7 @@ def get_env(session_id: str) -> DriftGym:
         envs[session_id].reset()
     return envs[session_id]
 
-@app.get("/")
-def home():
-    return {"message": "StaleMind API running"}
+
 
 class ResetRequest(BaseModel):
     scenario_index: Optional[int] = None
