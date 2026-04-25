@@ -1,0 +1,24 @@
+name: StaleMind
+description: Decision-making environment with hidden preference drift and relationship memory
+actions:
+  - ACCEPT
+  - REJECT
+  - ESCALATE
+  - PROPOSE_RESCHEDULE
+  - DELEGATE
+  - DRAFT_MESSAGE
+observation:
+  step: int
+  request: str
+  message: str
+  visible_preferences: list
+  relationships: dict
+reward:
+  score: float
+tasks:
+  - name: easy
+    description: Late drift with strong signal
+  - name: medium
+    description: Mid drift with moderate signal
+  - name: hard
+    description: Early drift with weak signal
