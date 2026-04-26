@@ -85,7 +85,7 @@ COMMITMENT_NOTES = [
     "Past decisions are narrowing how flexible the next move can be.",
 ]
 
-MAX_HISTORY = 5
+MAX_HISTORY = 100
 
 
 class StaleMindEnv:
@@ -263,7 +263,7 @@ class StaleMindEnv:
             difficulty = self.rng.choice(list(SCENARIO_PROFILES))
 
         profile = SCENARIO_PROFILES[difficulty]
-        max_steps = 10
+        max_steps = 20
 
         drift_steps = sorted([
             self.rng.randint(2, max_steps - 2),
