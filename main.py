@@ -1,9 +1,23 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, Optional
 from env.environment import StaleMindEnv as DriftGym
+import os
 
 app = FastAPI()
+
+# Serve assets (video, images) at /media — separate from Gradio's /assets/
+_assets_dir = os.path.join(os.path.dirname(__file__), "assets")
+if os.path.isdir(_assets_dir):
+    app.mount("/media", StaticFiles(directory=_assets_dir), name="media")
+
+@app.get("/video")
+def serve_video():
+    """Direct video endpoint — always works regardless of static file routing."""
+    path = os.path.join(os.path.dirname(__file__), "assets", "siri_type.mp4")
+    return FileResponse(path, media_type="video/mp4")
 
 # Session storage
 envs: Dict[str, DriftGym] = {}
