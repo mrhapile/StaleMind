@@ -8,17 +8,6 @@ import os
 
 app = FastAPI()
 
-# Serve assets (video, images) at /media — separate from Gradio's /assets/
-_assets_dir = os.path.join(os.path.dirname(__file__), "assets")
-if os.path.isdir(_assets_dir):
-    app.mount("/media", StaticFiles(directory=_assets_dir), name="media")
-
-@app.get("/video")
-def serve_video():
-    """Direct video endpoint — always works regardless of static file routing."""
-    path = os.path.join(os.path.dirname(__file__), "assets", "siri_type.mp4")
-    return FileResponse(path, media_type="video/mp4")
-
 # Session storage
 envs: Dict[str, DriftGym] = {}
 
@@ -27,8 +16,6 @@ def get_env(session_id: str) -> DriftGym:
         envs[session_id] = DriftGym()
         envs[session_id].reset()
     return envs[session_id]
-
-
 
 class ResetRequest(BaseModel):
     scenario_index: Optional[int] = None
@@ -46,7 +33,15 @@ def reset(req: Optional[ResetRequest] = None):
         req = ResetRequest()
     env = get_env(req.session_id)
     obs, _ = env.reset(req.scenario_index, req.config)
-    return {"observation": obs}
+    
+    # Standardize observation
+    message = obs.get("message") or obs.get("request") if isinstance(obs, dict) else str(obs)
+    
+    return {
+        "observation": {"message": message, "raw": obs},
+        "reward": {"alignment": 0.0},
+        "done": False
+    }
 
 @app.post("/step")
 def step(action: StepRequest):
@@ -55,15 +50,18 @@ def step(action: StepRequest):
     
     if obs is None:
         return {
-            "observation": {},
-            "reward": {"score": 0.0},
+            "observation": {"message": "Episode complete"},
+            "reward": {"alignment": 0.0},
             "done": True,
-            "message": "Episode complete"
+            "info": info
         }
         
+    # Standardize observation
+    message = obs.get("message") or obs.get("request") if isinstance(obs, dict) else str(obs)
+    
     return {
-        "observation": obs,
-        "reward": {"score": reward},
+        "observation": {"message": message, "raw": obs},
+        "reward": {"alignment": float(reward)},
         "done": done,
         "info": info,
     }

@@ -28,7 +28,7 @@ def create_state():
         "history": [],
         "last_action": None,
         "last_reward": 0.0,
-        "current_obs": {"message": "Wait... The story hasn't started yet. Initialize the engine."},
+        "current_obs": "Wait... The story hasn't started yet. Initialize the engine.",
         "done": False,
         "session_id": str(uuid.uuid4())
     }
@@ -48,9 +48,9 @@ def reset_fn(state=None):
     try:
         scenario_idx = random.randint(0, 2) # Ensuring scenarios vary
         res = requests.post(BASE_URL + "/reset", json={"session_id": state["session_id"], "scenario_index": scenario_idx}).json()
-        state["current_obs"] = res["observation"]
+        state["current_obs"] = res.get("observation", {}).get("message", "System reset.")
     except Exception as e:
-        state["current_obs"] = {"message": "Could not connect to backend API. Please make sure the server is initialized properly or hit RESET ENGINE."}
+        state["current_obs"] = "Could not connect to backend API. Please make sure the server is initialized properly or hit REBOOT."
     return state, *render_all(state, is_reset=True)
 
 def step_fn(action, state):
@@ -58,24 +58,36 @@ def step_fn(action, state):
         return state, *render_all(state)
 
     try:
+        # Standardized flatten request
         res = requests.post(
             BASE_URL + "/step", 
             json={"type": action, "session_id": state["session_id"], "content": ""}
         ).json()
         
-        reward_data = res.get("reward", {"score": 0})
+        # Robust parsing of standardized response
+        reward_data = res.get("reward", {})
         if isinstance(reward_data, dict):
-            reward = float(reward_data.get("score", 0))
+            reward = float(reward_data.get("alignment", 0))
         else:
             reward = float(reward_data)
 
-        obs = res.get("observation", {})
+        obs_data = res.get("observation", {})
+        if isinstance(obs_data, dict):
+            message = obs_data.get("message", "No response")
+            raw_obs = obs_data.get("raw", obs_data)
+        else:
+            message = str(obs_data)
+            raw_obs = {}
+
         info = res.get("info", {})
         
         state["last_action"] = action
         state["last_reward"] = reward
-        state["current_obs"] = obs
+        state["current_obs"] = message # Store the narrative message
         state["done"] = res.get("done", False)
+
+        # For backward compatibility with the logging logic expectations
+        current_obs_dict = raw_obs if isinstance(raw_obs, dict) else {}
 
         prev_bw = state["belief_work"]
         prev_bf = state["belief_family"]
@@ -102,15 +114,15 @@ def step_fn(action, state):
         rc = info.get("reward_components", {})
         drift_events = info.get("drift_events", [])
         delayed_penalties = info.get("delayed_penalties", [])
-        relationships = obs.get("relationships", {})
-        urgency = obs.get("urgency", 0)
-        impact = obs.get("impact", 0)
-        reversibility = obs.get("reversibility", 0)
-        delegation = obs.get("delegation_feasibility", 0)
-        commitment_load = obs.get("commitment_load", 0)
-        commitments = obs.get("commitments", [])
-        env_history = obs.get("history", [])
-        visible_prefs = obs.get("visible_preferences", [])
+        relationships = current_obs_dict.get("relationships", {})
+        urgency = current_obs_dict.get("urgency", 0)
+        impact = current_obs_dict.get("impact", 0)
+        reversibility = current_obs_dict.get("reversibility", 0)
+        delegation = current_obs_dict.get("delegation_feasibility", 0)
+        commitment_load = current_obs_dict.get("commitment_load", 0)
+        commitments = current_obs_dict.get("commitments", [])
+        env_history = current_obs_dict.get("history", [])
+        visible_prefs = current_obs_dict.get("visible_preferences", [])
         
         state["history"].append({
             "step": len(state["history"]) + 1,
@@ -144,12 +156,12 @@ def step_fn(action, state):
 # --- RENDER COMPONENTS ---
 
 def render_situation(state):
-    obs = state.get("current_obs", {})
+    obs = state.get("current_obs", "System standby...")
     if isinstance(obs, dict):
-        # After a step, obs has 'message' (env-built narrative) or 'request'
-        text = obs.get("message") or obs.get("request") or "No message"
+        text = obs.get("message") or str(obs)
     else:
         text = str(obs)
+    
     # CRITICAL: escape curly braces so f-string never crashes
     text = text.replace('{', '{{').replace('}', '}}')
     done_banner = ""
@@ -396,13 +408,9 @@ def render_timeline(state):
     return f"""
     <div style='display:flex; gap:1.15rem; align-items:flex-start;'>
         <div style='flex-shrink:0; margin-top:0.15rem;'>
-            <video autoplay muted loop playsinline
-                style='width:56px; height:56px; border-radius:50%; object-fit:cover;
-                       border:3px solid {color}88;
-                       box-shadow:0 0 15px {color}66, 0 0 30px {color}22;
-                       display:block;'>
-                <source src='/video' type='video/mp4'>
-            </video>
+            <div class="ai-orb" style='border-color: {color}88; box-shadow: 0 0 15px {color}66, 0 0 30px {color}22;'>
+                <div class="orb-inner"></div>
+            </div>
         </div>
         <div style='flex:1; background:rgba(15,23,42,0.35); border:1px solid {color}22;
                     border-left:4px solid {color}66; padding: 1.1rem 1.25rem; backdrop-filter:blur(6px);'>
@@ -731,48 +739,38 @@ if gr is not None:
     
     #dec_panel_wrap .panel { background: transparent !important; border: none !important; padding: 0 !important; }
     .gap { gap: 0.5rem !important; }
-    """
 
-    custom_js = """
-    function() {
-        // Create Siri orb video element and inject into body
-        var vid = document.createElement('video');
-        vid.id = 'siri-bg';
-        vid.muted = true;
-        vid.loop = true;
-        vid.playsInline = true;
-        vid.preload = 'auto';
-        vid.style.cssText = [
-            'position:fixed',
-            'right:2rem',
-            'top:50%',
-            'transform:translateY(-50%)',
-            'width:220px',
-            'height:220px',
-            'border-radius:50%',
-            'object-fit:cover',
-            'opacity:0',
-            'pointer-events:none',
-            'z-index:100',
-            'transition:opacity 0.9s ease',
-            'box-shadow:0 0 60px rgba(200,100,50,0.7),0 0 120px rgba(200,80,30,0.4)'
-        ].join(';');
-        var src = document.createElement('source');
-        src.src = '/video';
-        src.type = 'video/mp4';
-        vid.appendChild(src);
-        document.body.appendChild(vid);
-
-        var activated = false;
-        document.addEventListener('click', function(e) {
-            if (!activated && e.target && e.target.tagName === 'BUTTON') {
-                activated = true;
-                vid.play();
-                vid.style.opacity = '0.85';
-            }
-        }, true);
+    /* AI Orb Animation */
+    .ai-orb {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: 3px solid #38bdf8;
+        position: relative;
+        overflow: hidden;
+        background: #020617;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
+    
+    .orb-inner {
+        width: 70%;
+        height: 70%;
+        border-radius: 50%;
+        background: radial-gradient(circle, #38bdf8 0%, transparent 70%);
+        animation: orbPulse 3s infinite ease-in-out;
+    }
+
+    @keyframes orbPulse {
+        0% { transform: scale(0.8); opacity: 0.5; filter: blur(2px); }
+        50% { transform: scale(1.2); opacity: 0.9; filter: blur(0px); }
+        100% { transform: scale(0.8); opacity: 0.5; filter: blur(2px); }
+    }
+    
     """
+
+    custom_js = "function() {}"
 
     with gr.Blocks(theme=custom_theme, css=custom_css, title="StaleMind Phase 3") as demo:
         
